@@ -27,8 +27,10 @@ for apk in apks:
             for name in ['libaether.so', 'libaether_final_proxy.so', 'libaethertun.so', 'libhev-socks5-tunnel.so']:
                 data = z.read(f'lib/{abi}/{name}')
                 assert data[:4] == b'\x7fELF', f'Malformed {abi}/{name}'
-                if abi == 'arm64-v8a':
-                    assert all(a >= 16384 for a in elf_load_alignment(data)), f'4KB-only native component: {name}'
+            if abi == 'arm64-v8a':
+                for name in z.namelist():
+                    if name.startswith('lib/arm64-v8a/') and name.endswith('.so'):
+                        assert all(a >= 16384 for a in elf_load_alignment(z.read(name))), f'4KB-only native component: {name}'
         if 'universal' in apk.name:
             assert abis == {'arm64-v8a', 'armeabi-v7a'}, abis
         print(apk.name, sorted(abis), 'native components verified')

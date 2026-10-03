@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 8.0 base theme; display-cutout support belongs in values-v28. -->
+    <style name="Theme.AetherMobile" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/aether_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>

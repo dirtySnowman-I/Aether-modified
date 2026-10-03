@@ -25,9 +25,10 @@ preview/debug signed. The original app's signing key is not used.
 
 ## Use
 
-1. Download the `Aether-Modified-Android-0.9.2` artifact from a successful
-   **Android final proxy** workflow run. Unzip it and install the universal APK
-   (Android 8.0+, ARM64 or ARMv7).
+1. Download and install the universal APK from the
+   [Android preview release](https://github.com/dirtySnowman-I/Aether-modified/releases/tag/v0.9.2-android.1)
+   (Android 8.0+, ARM64 or ARMv7). APKs are also in the
+   `Aether-Modified-Android-0.9.2` workflow artifact.
 2. Open **Aether Modified**, open Advanced, and choose your working protocol
    and settings. WireGuard remains available.
 3. Enable **Use a final proxy** and enter the proxy host, port, and optional
