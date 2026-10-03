@@ -13,6 +13,8 @@ jobs:
   apk:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    permissions:
+      contents: write
     env:
       NDK_VERSION: '28.2.13676358'
       RUSTFLAGS: '-C link-arg=-Wl,-z,max-page-size=16384'
@@ -43,8 +45,19 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android,armv7-linux-androideabi
+      - name: Fetch pinned native sources
+        working-directory: android/upstream
+        env:
+          AETHER_FORCE_CLONE: '1'
+          AETHER_REF: v1.5.0
+          HEV_REF: '2.18.0'
+        run: |
+          bash scripts/fetch-natives.sh
+          test "$(git -C .native/aether rev-parse HEAD)" = 66a798b7771d5ffbb28fc858bffc99fb67295baf
+          test "$(git -C .native/hev-socks5-tunnel rev-parse HEAD)" = d9dca26c7ad0e494492244f0309e80ee583e739e
       - uses: Swatinem/rust-cache@v2
         with:
+          cache-on-failure: true
           workspaces: |
             src-tauri/exit-proxy
             android/exit-proxy-jni
@@ -61,16 +74,6 @@ jobs:
           java -Djava.library.path=android/exit-proxy-jni/target/debug -cp android/jni-smoke-classes studio.cluvex.aether.core.FinalProxy
       - name: Install cargo-ndk
         run: cargo install cargo-ndk --locked
-      - name: Fetch pinned native sources
-        working-directory: android/upstream
-        env:
-          AETHER_FORCE_CLONE: '1'
-          AETHER_REF: v1.5.0
-          HEV_REF: '2.18.0'
-        run: |
-          bash scripts/fetch-natives.sh
-          test "$(git -C .native/aether rev-parse HEAD)" = 66a798b7771d5ffbb28fc858bffc99fb67295baf
-          test "$(git -C .native/hev-socks5-tunnel rev-parse HEAD)" = d9dca26c7ad0e494492244f0309e80ee583e739e
       - name: Apply modified client
         run: |
           rsync -a android/overlay/ android/upstream/
@@ -80,8 +83,9 @@ jobs:
         working-directory: android/upstream
         run: bash scripts/build-natives.sh all
       - name: Build the v0.9.2 final-proxy library for both phone CPUs
+        working-directory: android/exit-proxy-jni
         run: |
-          cargo ndk -t arm64-v8a -t armeabi-v7a --platform 26 -o android/upstream/app/src/main/jniLibs build --manifest-path android/exit-proxy-jni/Cargo.toml --release
+          cargo ndk -t arm64-v8a -t armeabi-v7a --platform 26 -o ../upstream/app/src/main/jniLibs build --release
       - name: Build installable preview APKs
         working-directory: android/upstream
         run: gradle --no-daemon assembleDebug lintDebug
@@ -102,6 +106,11 @@ jobs:
           path: android/artifacts/*
           retention-days: 90
           if-no-files-found: error
+      - name: Publish Android preview APK downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create v0.9.2-android.1 android/artifacts/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --title 'Aether Modified 0.9.2 for Android — preview 1' --notes-file android/release-notes.md
       - uses: actions/upload-artifact@v4
         if: always()
         with:
