@@ -31,6 +31,8 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - name: Install native toolchain
         run: |
           sdkmanager "ndk;${NDK_VERSION}" "platforms;android-35" "build-tools;35.0.0"
@@ -54,6 +56,9 @@ jobs:
         run: |
           cargo test --manifest-path src-tauri/exit-proxy/Cargo.toml --locked
           cargo test --manifest-path android/exit-proxy-jni/Cargo.toml
+          cargo build --manifest-path android/exit-proxy-jni/Cargo.toml
+          javac -d android/jni-smoke-classes android/tests/FinalProxy.java
+          java -Djava.library.path=android/exit-proxy-jni/target/debug -cp android/jni-smoke-classes studio.cluvex.aether.core.FinalProxy
       - name: Install cargo-ndk
         run: cargo install cargo-ndk --locked
       - name: Fetch pinned native sources
@@ -104,4 +109,3 @@ jobs:
           path: |
             android/upstream/app/build/reports/lint-results-debug.html
             android/upstream/app/build/reports/lint-results-debug.xml
-
