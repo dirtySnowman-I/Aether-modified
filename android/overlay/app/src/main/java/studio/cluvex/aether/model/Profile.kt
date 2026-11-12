@@ -201,8 +201,10 @@ data class FinalProxyProfile(
     val udpEnabled: Boolean = true,
     val username: String = "",
     val password: String = "",
+    /** Keep the username and password on this phone (encrypted, see CredentialVault). */
+    val rememberCredentials: Boolean = true,
 ) {
-    override fun toString(): String = "FinalProxyProfile(enabled=$enabled, kind=$kind, udp=$udpEnabled, credentials=[redacted])"
+    override fun toString(): String = "FinalProxyProfile(enabled=$enabled, kind=$kind, udp=$udpEnabled, remember=$rememberCredentials, credentials=[redacted])"
     fun withoutSecrets(): FinalProxyProfile = copy(username = "", password = "")
     fun toJson(): org.json.JSONObject = org.json.JSONObject().apply {
         put("kind", kind); put("host", host.trim()); put("port", port.toIntOrNull() ?: 0)

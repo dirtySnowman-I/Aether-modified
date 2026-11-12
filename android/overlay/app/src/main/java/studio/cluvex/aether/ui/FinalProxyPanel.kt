@@ -27,7 +27,8 @@ fun FinalProxyPanel(value: FinalProxyProfile, onChange: (FinalProxyProfile) -> U
     Spacer(Modifier.height(8.dp))
     LtrOutlinedTextField(value = value.host, onValueChange = { onChange(value.copy(host = it)) },
         label = { Text("Host") }, enabled = enabled, singleLine = true, modifier = Modifier.fillMaxWidth())
-    LtrOutlinedTextField(value = value.port, onValueChange = { onChange(value.copy(port = it)) },
+    LtrOutlinedTextField(value = value.port,
+        onValueChange = { onChange(value.copy(port = it.filter(Char::isDigit).take(5))) },
         label = { Text("Port") }, enabled = enabled, singleLine = true, modifier = Modifier.fillMaxWidth())
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text("Username and password", Modifier.weight(1f))
@@ -39,7 +40,18 @@ fun FinalProxyPanel(value: FinalProxyProfile, onChange: (FinalProxyProfile) -> U
         OutlinedTextField(value = value.password, onValueChange = { onChange(value.copy(password = it)) },
             label = { Text("Password") }, visualTransformation = PasswordVisualTransformation(),
             enabled = enabled, singleLine = true, modifier = Modifier.fillMaxWidth())
-        Text("Credentials stay in memory. Enter them again after restarting the app.", style = MaterialTheme.typography.bodySmall)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Remember on this phone", Modifier.weight(1f))
+            Switch(value.rememberCredentials, { onChange(value.copy(rememberCredentials = it)) }, enabled = enabled)
+        }
+        Text(
+            if (value.rememberCredentials) {
+                "Saved on this phone, encrypted with the Android Keystore. Turn off to delete them."
+            } else {
+                "Not saved. Enter them again after restarting the app."
+            },
+            style = MaterialTheme.typography.bodySmall,
+        )
     }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text("Forward UDP", Modifier.weight(1f))

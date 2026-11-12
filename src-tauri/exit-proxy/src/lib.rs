@@ -462,9 +462,11 @@ impl Server {
                             if state.clients.load(Ordering::Relaxed) >= MAX_CLIENTS {
                                 continue;
                             }
+                            // Only a stopped server ends the loop; a failure
+                            // to track one client drops that client alone.
                             let client = match state.track(client) {
                                 Ok(c) => c,
-                                Err(_) => break,
+                                Err(_) => continue,
                             };
                             state.clients.fetch_add(1, Ordering::Relaxed);
                             let shared = state.clone();

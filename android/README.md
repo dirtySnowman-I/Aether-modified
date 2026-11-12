@@ -26,15 +26,19 @@ preview/debug signed. The original app's signing key is not used.
 ## Use
 
 1. Download and install the universal APK from the
-   [Android preview release](https://github.com/dirtySnowman-I/Aether-modified/releases/tag/v0.9.2-android.1)
+   [Android preview release](https://github.com/dirtySnowman-I/Aether-modified/releases/tag/v0.9.2-android.2)
    (Android 8.0+, ARM64 or ARMv7). APKs are also in the
-   `Aether-Modified-Android-0.9.2` workflow artifact.
+   `Aether-Modified-Android-0.9.2` workflow artifact. Uninstall an earlier
+   preview first: each preview is signed with a temporary debug key, so Android
+   will not install one over another.
 2. Open **Aether Modified**, open Advanced, and choose your working protocol
    and settings. WireGuard remains available.
 3. Enable **Use a final proxy** and enter the proxy host, port, and optional
    username/password. Enable **Forward UDP** for a SOCKS5 proxy that supports
-   UDP ASSOCIATE. Credentials are held in memory and must be entered again
-   after restarting the app.
+   UDP ASSOCIATE. With **Remember on this phone** on (the default), the
+   username and password are saved encrypted with an Android Keystore key and
+   filled in next time, including for the Quick Settings tile. Turn it off to
+   delete them.
 4. Leave **Proxy mode** off for whole-phone routing. Leave split tunneling off
    to capture every other app. Press Connect and accept Android's VPN prompt.
 5. The app checks both proxy hops and then runs its end-to-end connectivity

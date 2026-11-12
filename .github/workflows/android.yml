@@ -96,7 +96,7 @@ jobs:
           for apk in android/upstream/app/build/outputs/apk/debug/*.apk; do
             "$ANDROID_SDK_ROOT/build-tools/35.0.0/apksigner" verify "$apk"
             filename="$(basename "$apk")"
-            cp "$apk" "android/artifacts/Aether-Modified-0.9.2-android.1-${filename#app-}"
+            cp "$apk" "android/artifacts/Aether-Modified-0.9.2-android.2-${filename#app-}"
           done
           cd android/artifacts
           sha256sum *.apk > SHA256SUMS.txt
@@ -116,10 +116,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view v0.9.2-android.1 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+          if gh release view v0.9.2-android.2 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo 'This preview version is already published. Current build APKs remain available in workflow artifacts; increment the app version to publish the next preview.'
           else
-            gh release create v0.9.2-android.1 android/artifacts/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --title 'Aether Modified 0.9.2 for Android — preview 1' --notes-file android/release-notes.md
+            gh release create v0.9.2-android.2 android/artifacts/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --title 'Aether Modified 0.9.2 for Android — preview 2' --notes-file android/release-notes.md
           fi
       - uses: actions/upload-artifact@v4
         if: always()

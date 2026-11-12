@@ -7,8 +7,8 @@ p = root / 'app/build.gradle.kts'
 s = p.read_text()
 assert 'versionName = "1.2.2"' in s
 s = s.replace('applicationId = "studio.cluvex.aether"', 'applicationId = "studio.aether.modified"')
-s = s.replace('versionCode = 6', 'versionCode = 1')
-s = s.replace('versionName = "1.2.2"', 'versionName = "0.9.2-android.1"')
+s = s.replace('versionCode = 6', 'versionCode = 2')
+s = s.replace('versionName = "1.2.2"', 'versionName = "0.9.2-android.2"')
 s = s.replace('useLegacyPackaging = true', 'useLegacyPackaging = true\n            keepDebugSymbols += setOf("**/libaether.so")')
 # A separate package installs alongside the original APK. Debug preview signing
 # avoids using the upstream maintainer's public CI signing key.
