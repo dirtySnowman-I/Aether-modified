@@ -15,6 +15,11 @@ use std::time::{Duration, Instant};
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(15);
 const MAX_CLIENTS: usize = 128;
 const MAX_HTTP_HEAD: usize = 16 * 1024;
+/// Close a relayed TCP connection after this long with no data either way.
+/// Longer than common proxy defaults (Xray: 5 minutes).
+const IDLE_TIMEOUT: Duration = Duration::from_secs(10 * 60);
+/// At most one "too many connections" log line per this interval.
+const FULL_REPORT_INTERVAL: Duration = Duration::from_secs(30);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
@@ -455,11 +460,24 @@ impl Server {
         let worker = thread::Builder::new()
             .name("final-proxy-listener".into())
             .spawn(move || {
+                let mut last_full_report: Option<Instant> = None;
                 while !state.stopped.load(Ordering::Acquire) {
                     state.expire_handshakes();
                     match listener.accept() {
                         Ok((client, _)) => {
                             if state.clients.load(Ordering::Relaxed) >= MAX_CLIENTS {
+                                // Refused by closing it; say so in the log
+                                // instead of failing silently.
+                                drop(client);
+                                let now = Instant::now();
+                                if last_full_report.map_or(true, |t| {
+                                    now.duration_since(t) >= FULL_REPORT_INTERVAL
+                                }) {
+                                    last_full_report = Some(now);
+                                    on_error(format!(
+                                        "Final proxy: {MAX_CLIENTS} connections are already open; refused a new one. An app may be opening too many connections."
+                                    ));
+                                }
                                 continue;
                             }
                             // Only a stopped server ends the loop; a failure
@@ -577,12 +595,94 @@ fn handle_client(mut client: Tracked, shared: &Arc<Shared>) -> io::Result<()> {
     relay(client, remote)
 }
 
-fn relay(mut client: Tracked, mut remote: Tracked) -> io::Result<()> {
-    let mut upload_in = client.stream.try_clone()?;
-    let mut upload_out = remote.stream.try_clone()?;
-    thread::scope(|scope| {
+fn relay(client: Tracked, remote: Tracked) -> io::Result<()> {
+    splice(&client.stream, &remote.stream, IDLE_TIMEOUT, IDLE_CHECK)
+}
+
+/// When to wake a blocked read to check whether the connection is idle.
+const IDLE_CHECK: Duration = Duration::from_secs(5);
+
+/// "Last byte moved in either direction" for one relayed connection.
+struct Activity {
+    start: Instant,
+    last_ms: AtomicU64,
+    idle: AtomicBool,
+}
+
+impl Activity {
+    fn new() -> Self {
+        Self {
+            start: Instant::now(),
+            last_ms: AtomicU64::new(0),
+            idle: AtomicBool::new(false),
+        }
+    }
+
+    fn touch(&self) {
+        self.last_ms
+            .store(self.start.elapsed().as_millis() as u64, Ordering::Relaxed);
+    }
+
+    fn idle_for(&self) -> Duration {
+        self.start
+            .elapsed()
+            .saturating_sub(Duration::from_millis(self.last_ms.load(Ordering::Relaxed)))
+    }
+}
+
+/// Copies one direction. Read timeouts only wake the loop to check whether
+/// the WHOLE connection has gone idle, so a one-way stream (a long download)
+/// keeps its quiet direction open.
+fn pump(
+    from: &mut TcpStream,
+    to: &mut TcpStream,
+    activity: &Activity,
+    idle_timeout: Duration,
+) -> io::Result<()> {
+    let mut buffer = [0u8; 16 * 1024];
+    loop {
+        match from.read(&mut buffer) {
+            Ok(0) => return Ok(()),
+            Ok(n) => {
+                activity.touch();
+                to.write_all(&buffer[..n])?;
+                activity.touch();
+            }
+            Err(e) if matches!(e.kind(), io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut) => {
+                if activity.idle.load(Ordering::Relaxed) || activity.idle_for() >= idle_timeout {
+                    activity.idle.store(true, Ordering::Relaxed);
+                    return Err(io::Error::new(io::ErrorKind::TimedOut, "idle connection"));
+                }
+            }
+            Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
+            Err(e) => return Err(e),
+        }
+    }
+}
+
+/// Relays both directions, keeping TCP half-close. A connection with no data
+/// in either direction for `idle_timeout` is closed: the hop beyond Aether
+/// can die without either local socket noticing, and each relay holds two
+/// threads and one of the MAX_CLIENTS slots.
+fn splice(
+    client: &TcpStream,
+    remote: &TcpStream,
+    idle_timeout: Duration,
+    check: Duration,
+) -> io::Result<()> {
+    for stream in [client, remote] {
+        stream.set_read_timeout(Some(check))?;
+        stream.set_write_timeout(Some(idle_timeout))?;
+    }
+    let activity = Activity::new();
+    let activity = &activity;
+    let mut upload_in = client.try_clone()?;
+    let mut upload_out = remote.try_clone()?;
+    let mut download_in = remote.try_clone()?;
+    let mut download_out = client.try_clone()?;
+    let result = thread::scope(|scope| {
         let upload = scope.spawn(move || {
-            let result = io::copy(&mut upload_in, &mut upload_out);
+            let result = pump(&mut upload_in, &mut upload_out, activity, idle_timeout);
             let _ = upload_out.shutdown(if result.is_ok() {
                 Shutdown::Write
             } else {
@@ -593,22 +693,25 @@ fn relay(mut client: Tracked, mut remote: Tracked) -> io::Result<()> {
             }
             result
         });
-        let download = io::copy(&mut remote.stream, &mut client.stream);
-        let _ = client.stream.shutdown(if download.is_ok() {
+        let download = pump(&mut download_in, &mut download_out, activity, idle_timeout);
+        let _ = download_out.shutdown(if download.is_ok() {
             Shutdown::Write
         } else {
             Shutdown::Both
         });
         if download.is_err() {
-            let _ = remote.stream.shutdown(Shutdown::Both);
+            let _ = download_in.shutdown(Shutdown::Both);
         }
         let upload = upload
             .join()
             .map_err(|_| io::Error::other("Proxy relay worker stopped"))?;
-        upload?;
-        download?;
-        Ok(())
-    })
+        upload.and(download)
+    });
+    // Closing an idle connection is normal, not an error for the log.
+    if activity.idle.load(Ordering::Relaxed) {
+        return Ok(());
+    }
+    result
 }
 
 #[cfg(test)]
