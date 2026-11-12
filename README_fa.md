@@ -4,7 +4,9 @@
 
 این نسخه بر پایه‌ی [MatinSenPai/Aether-GUI](https://github.com/MatinSenPai/Aether-GUI) ساخته شده و گزینه‌ی **Final proxy** را برای استفاده از پراکسی شخصی پس از تونل Aether، از جمله WireGuard، اضافه می‌کند. راهنمای تنظیم و ساخت این نسخه در [FINAL-PROXY.md](FINAL-PROXY.md) آمده است.
 
-[![Build](https://github.com/ella4moon/Aether-modified/actions/workflows/build.yml/badge.svg)](https://github.com/ella4moon/Aether-modified/actions/workflows/build.yml)
+**تازه در نسخه‌ی 0.9.4:** در ویندوز، نام کاربری و رمز پراکسی نهایی بعد از اولین اتصال موفق ذخیره می‌شود و دفعه‌ی بعد خودکار پر می‌شود. این اطلاعات با DPAPI ویندوز و فقط برای حساب کاربری شما رمزنگاری می‌شود. برای پاک کردنش، گزینه‌ی **Remember on this computer** را خاموش کنید.
+
+[![Build](https://github.com/dirtySnowman-I/Aether-modified/actions/workflows/build.yml/badge.svg)](https://github.com/dirtySnowman-I/Aether-modified/actions/workflows/build.yml)
 [![License: AGPL v3](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D6)
 ![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white)
@@ -38,7 +40,7 @@
 
 ## نصب
 
-برای ساخت این نسخه از [راهنمای ویندوز](FINAL-PROXY.md#build-on-windows) یا [گردش کار build](https://github.com/ella4moon/Aether-modified/actions/workflows/build.yml) استفاده کنید. در Actions گزینه‌ی **Run workflow** را برای شاخه‌ی `main` بزنید و پس از موفقیت، فایل `bundles-windows-x86_64` را از بخش **Artifacts** دانلود و استخراج کنید:
+برای ساخت این نسخه از [راهنمای ویندوز](FINAL-PROXY.md#build-on-windows) یا [گردش کار build](https://github.com/dirtySnowman-I/Aether-modified/actions/workflows/build.yml) استفاده کنید. در Actions گزینه‌ی **Run workflow** را برای شاخه‌ی `main` بزنید و پس از موفقیت، فایل `bundles-windows-x86_64` را از بخش **Artifacts** دانلود و استخراج کنید:
 
 - `Aether-GUI_x.y.z_x64-setup.exe` — نصب‌کننده‌ی معمولی (پیشنهادی)
 - `Aether-GUI_x.y.z_x64_en-US.msi` — بسته‌ی MSI، برای نصبِ اسکریپتی/سازمانی

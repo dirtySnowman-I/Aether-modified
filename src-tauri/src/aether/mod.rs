@@ -1,6 +1,7 @@
 pub mod orphan;
 pub mod profiles;
 pub mod prompts;
+pub mod secrets;
 pub mod pty;
 pub mod status;
 

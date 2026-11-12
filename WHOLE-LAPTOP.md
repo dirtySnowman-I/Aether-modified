@@ -8,10 +8,11 @@ extension. This works with the WireGuard protocol you already use in Aether.
 
 ## Setup
 
-1. Open the latest successful [build](https://github.com/ella4moon/Aether-modified/actions/workflows/build.yml)
+1. Open the latest successful [build](https://github.com/dirtySnowman-I/Aether-modified/actions/workflows/build.yml)
    on `main` (builds now start automatically on updates; **Run workflow** is also
-   available). Extract `bundles-windows-x86_64`, then install the **0.9.3** setup
-   executable or MSI. Version 0.9.3 uses a userspace TCP stack and requires
+   available). Extract `bundles-windows-x86_64`, then install the **0.9.4** setup
+   executable or MSI. Version 0.9.4 remembers the final proxy's username and
+   password between launches. Version 0.9.3 uses a userspace TCP stack and requires
    returned TCP data plus a DNS reply through the final proxy after capture
    starts. Version 0.9.2 added explicit routes and route-selection checks. Version 0.9.1 fixed the
    first-connection adapter check; version 0.8.0 does not forward UDP.
@@ -19,7 +20,8 @@ extension. This works with the WireGuard protocol you already use in Aether.
    app and choose **Run as administrator**. Windows requires elevation to create
    the adapter and routes. No permanent service or startup task is installed.
 3. In **Advanced**, keep your working **WireGuard** and **Final proxy** settings.
-   Re-enter proxy credentials if needed; they stay in memory. Keep **SOCKS5 Proxy**
+   Saved proxy credentials are filled in automatically (see
+   [FINAL-PROXY.md](FINAL-PROXY.md#use-it)). Keep **SOCKS5 Proxy**
    on a loopback address such as `127.0.0.1:1819`, with LAN sharing disabled.
 4. Choose a **SOCKS5** endpoint that supports **UDP ASSOCIATE**, and enable
    **Final proxy → Forward UDP**. This setting also enables UDP for applications

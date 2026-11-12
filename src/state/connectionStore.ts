@@ -24,6 +24,9 @@ interface ConnectionState {
   scanBudgetSecs: number | null;
   /** Monotonic key for controls that must reset between explicit connects. */
   attemptId: number;
+  /** True where the backend can keep final-proxy credentials encrypted
+   * between launches (Windows DPAPI). */
+  credentialStorage: boolean;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   setProtocol: (protocol: ConnectionProfile["protocol"]) => void;
@@ -47,6 +50,7 @@ interface ConnectionState {
   setRoutesFile: (routes_file: string) => void;
   setFinalProxy: (patch: Partial<ConnectionProfile["final_proxy"]>) => void;
   setWholeLaptop: (whole_laptop: boolean) => void;
+  setRememberCredentials: (remember: boolean) => void;
   retryAfterSidecarError: () => void;
 }
 
@@ -54,7 +58,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   status: { state: "Idle" },
   profile: {
     whole_laptop: false,
-    final_proxy: { enabled: false, kind: "socks5", host: "", port: "1080", authenticate: false, udp_enabled: false, username: "", password: "" },
+    final_proxy: { enabled: false, kind: "socks5", host: "", port: "1080", authenticate: false, udp_enabled: false, username: "", password: "", remember_credentials: true },
     protocol: "auto",
     scan_mode: "balanced",
     ip_version: "v4",
@@ -79,6 +83,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   sidecarError: null,
   scanBudgetSecs: null,
   attemptId: 0,
+  credentialStorage: false,
 
   connect: async () => {
     // A fresh user-initiated attempt should not inherit stale log-driven UI
@@ -183,6 +188,20 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   setWholeLaptop: (whole_laptop) =>
     set((s) => ({ profile: { ...s.profile, whole_laptop } })),
 
+  // Applied immediately on the backend too: turning it off deletes the saved
+  // username and password now, not at the next successful connect.
+  setRememberCredentials: (remember_credentials) => {
+    set((s) => ({
+      profile: {
+        ...s.profile,
+        final_proxy: { ...s.profile.final_proxy, remember_credentials },
+      },
+    }));
+    invoke("set_remember_credentials", { remember: remember_credentials }).catch((e) =>
+      console.error("Failed to update saved proxy credentials:", e),
+    );
+  },
+
   // Clears the fallback screen so the user can attempt Connect again (e.g.
   // after fixing a broken install) — the next connect() call will re-set
   // sidecarError if the binary is still missing.
@@ -240,11 +259,12 @@ export async function initConnectionListeners(): Promise<() => void> {
   // command touches the Aether binary, so a failure here is an IPC-layer
   // bug, not a sidecar problem — logged rather than shown as sidecarError.
   try {
-    const [status, profile] = await Promise.all([
+    const [status, profile, credentialStorage] = await Promise.all([
       invoke<ConnectionStatus>("get_status"),
       invoke<ConnectionProfile>("get_default_profile"),
+      invoke<boolean>("credentials_storage_supported"),
     ]);
-    useConnectionStore.setState({ status, profile });
+    useConnectionStore.setState({ status, profile, credentialStorage });
   } catch (e) {
     console.error("Failed to load initial connection state:", e);
   }

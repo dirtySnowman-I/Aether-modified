@@ -4,7 +4,7 @@ For apps without proxy settings on Windows 11, see the new
 [Whole laptop option](WHOLE-LAPTOP.md). Version **0.9.0** adds native UDP support
 to both the local relay and whole-laptop mode.
 
-This modified source is published at [ella4moon/Aether-modified](https://github.com/ella4moon/Aether-modified)
+This modified source is published at [dirtySnowman-I/Aether-modified](https://github.com/dirtySnowman-I/Aether-modified)
 and is based on [MatinSenPai/Aether-GUI](https://github.com/MatinSenPai/Aether-GUI) commit
 `93314fcd97bf6b446d537aac9538b01bef04c7a0` (version 0.7.0).
 It keeps the upstream Aether engine pinned to v1.5.0 and adds an optional final
@@ -20,7 +20,12 @@ proxy in the GUI. WireGuard is supported with the same engine and settings.
    For example, enter `proxy.example.com` in Host and `1080` in Port. Use the
    values from your actual proxy service; the example is a placeholder.
 5. If needed, turn on **Username and password** and enter both locally in the app.
-   Credentials are kept in memory and must be entered again after restarting.
+   On Windows, **Remember on this computer** (on by default) saves them after the
+   first successful connection, so they are filled in on the next launch. They
+   are encrypted with Windows DPAPI for your Windows account and kept in
+   `credentials.json` in the app's data folder, never in `profile.json`. Turn
+   the switch off to delete them. On other platforms they stay in memory and
+   must be entered again after restarting.
 6. To forward UDP, choose **SOCKS5** and turn on **Forward UDP**. Your provider
    must support **UDP ASSOCIATE** at that endpoint; SOCKS5 support alone does not
    guarantee this. HTTP CONNECT can still be used for TCP.
@@ -101,7 +106,7 @@ It does not start a tunnel or ask for your proxy credentials.
 
 Installers are generated under `src-tauri/target/release/bundle/`.
 
-Alternatively, open this repository's [build workflow](https://github.com/ella4moon/Aether-modified/actions/workflows/build.yml),
+Alternatively, open this repository's [build workflow](https://github.com/dirtySnowman-I/Aether-modified/actions/workflows/build.yml),
 select **Run workflow**, choose `main`, and run it. After the Windows job succeeds,
 open the completed run and download `bundles-windows-x86_64` from **Artifacts**.
 Extract the archive and run the included setup executable or MSI installer.

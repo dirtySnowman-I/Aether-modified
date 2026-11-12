@@ -12,13 +12,19 @@ See [FINAL-PROXY.md](FINAL-PROXY.md) for setup and build instructions, and
 [VERIFICATION.md](VERIFICATION.md) for test results and remaining validation limits.
 The desktop application retains the upstream Aether-GUI name.
 
+**New in 0.9.4:** the final proxy's username and password are remembered after
+the first successful connection on Windows (encrypted with DPAPI for your Windows
+account; turn off **Remember on this computer** to delete them). Also fixes the
+status staying on "Starting Aether…" during the whole route scan, and stops the
+startup clean-up from killing an unrelated process that reused an old Aether PID.
+
 **New in 0.9.0:** UDP forwarding is available in both the local SOCKS5 relay and
 [Whole laptop on Windows 11](WHOLE-LAPTOP.md). Choose a UDP-capable SOCKS5 final
 proxy and enable **Forward UDP** in Advanced. Whole laptop additionally requires
 administrator access and routes ordinary apps' TCP, UDP and DNS through that
 proxy. It is active only while connected and is not a kill switch.
 
-[![Build](https://github.com/ella4moon/Aether-modified/actions/workflows/build.yml/badge.svg)](https://github.com/ella4moon/Aether-modified/actions/workflows/build.yml)
+[![Build](https://github.com/dirtySnowman-I/Aether-modified/actions/workflows/build.yml/badge.svg)](https://github.com/dirtySnowman-I/Aether-modified/actions/workflows/build.yml)
 [![License: AGPL v3](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D6)
 ![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white)
@@ -53,7 +59,7 @@ This project does not reimplement any of Aether's tunneling logic. It drives the
 ## Installing
 
 Build this modified version using [the Windows build script](FINAL-PROXY.md#build-on-windows)
-or the repository's [GitHub Actions build workflow](https://github.com/ella4moon/Aether-modified/actions/workflows/build.yml).
+or the repository's [GitHub Actions build workflow](https://github.com/dirtySnowman-I/Aether-modified/actions/workflows/build.yml).
 Updates to `main` now build automatically. In Actions, open the latest successful
 run, or select **Run workflow** on `main`. Download
 `bundles-windows-x86_64` from the run's **Artifacts** section and extract it.

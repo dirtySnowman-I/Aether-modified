@@ -36,6 +36,8 @@ fn main() {
             commands::get_status,
             commands::get_default_profile,
             commands::set_default_profile,
+            commands::credentials_storage_supported,
+            commands::set_remember_credentials,
             commands::get_close_to_tray,
             commands::set_close_to_tray,
             commands::get_whole_laptop_support,

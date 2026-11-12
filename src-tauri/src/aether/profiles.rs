@@ -19,6 +19,10 @@ pub struct FinalProxyProfile {
     pub udp_enabled: bool,
     pub username: String,
     pub password: String,
+    /// Keep the username and password for the next launch (Windows: DPAPI,
+    /// see secrets.rs). On by default, including for profiles saved by
+    /// older versions.
+    pub remember_credentials: bool,
 }
 
 impl std::fmt::Debug for FinalProxyProfile {
@@ -30,6 +34,7 @@ impl std::fmt::Debug for FinalProxyProfile {
             .field("port", &self.port)
             .field("authenticate", &self.authenticate)
             .field("udp_enabled", &self.udp_enabled)
+            .field("remember_credentials", &self.remember_credentials)
             .finish_non_exhaustive()
     }
 }
@@ -45,6 +50,7 @@ impl Default for FinalProxyProfile {
             udp_enabled: false,
             username: String::new(),
             password: String::new(),
+            remember_credentials: true,
         }
     }
 }
@@ -420,6 +426,59 @@ mod tests {
     use super::*;
 
     #[test]
+    fn old_profiles_remember_credentials_and_profile_json_never_holds_them() {
+        let old: FinalProxyProfile =
+            serde_json::from_str(r#"{"enabled":true,"host":"exit.example","authenticate":true}"#)
+                .unwrap();
+        assert!(old.remember_credentials);
+        let profile = ConnectionProfile {
+            final_proxy: FinalProxyProfile {
+                username: "user-secret".into(),
+                password: "password-secret".into(),
+                remember_credentials: false,
+                ..old
+            },
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&profile.without_secrets()).unwrap();
+        assert!(!json.contains("secret"));
+        assert!(json.contains(r#""remember_credentials":false"#));
+    }
+
+    #[test]
+    fn credentials_are_saved_only_when_used_and_remembered() {
+        let used = FinalProxyProfile {
+            enabled: true,
+            host: "exit.example".into(),
+            authenticate: true,
+            username: "u".into(),
+            password: "p".into(),
+            ..Default::default()
+        };
+        assert_eq!(credential_action(&used), CredentialAction::Save);
+        let not_remembered = FinalProxyProfile {
+            remember_credentials: false,
+            ..used.clone()
+        };
+        assert_eq!(credential_action(&not_remembered), CredentialAction::Forget);
+        let auth_off = FinalProxyProfile {
+            authenticate: false,
+            ..used.clone()
+        };
+        assert_eq!(credential_action(&auth_off), CredentialAction::Keep);
+        let proxy_off = FinalProxyProfile {
+            enabled: false,
+            ..used.clone()
+        };
+        assert_eq!(credential_action(&proxy_off), CredentialAction::Keep);
+        let blank = FinalProxyProfile {
+            password: String::new(),
+            ..used
+        };
+        assert_eq!(credential_action(&blank), CredentialAction::Keep);
+    }
+
+    #[test]
     fn persisted_final_proxy_requires_credentials_again() {
         let mut profile = ConnectionProfile::default();
         profile.final_proxy = FinalProxyProfile {
@@ -638,11 +697,67 @@ const STORE_KEY: &str = "last_successful_profile";
 /// guess can't poison future one-click connects.
 pub fn load(app: &tauri::AppHandle) -> ConnectionProfile {
     use tauri_plugin_store::StoreExt;
-    app.store(STORE_FILE)
+    let mut profile: ConnectionProfile = app
+        .store(STORE_FILE)
         .ok()
         .and_then(|s| s.get(STORE_KEY))
         .and_then(|v| serde_json::from_value(v).ok())
-        .unwrap_or_default()
+        .unwrap_or_default();
+    if profile.final_proxy.remember_credentials {
+        if let Some(saved) = super::secrets::load(app) {
+            profile.final_proxy.username = saved.username;
+            profile.final_proxy.password = saved.password;
+        }
+    }
+    profile
+}
+
+/// What to do with the saved final-proxy credentials after a successful
+/// connection.
+#[derive(Debug, PartialEq, Eq)]
+enum CredentialAction {
+    Save,
+    Forget,
+    Keep,
+}
+
+fn credential_action(proxy: &FinalProxyProfile) -> CredentialAction {
+    if !proxy.remember_credentials {
+        CredentialAction::Forget
+    } else if proxy.enabled
+        && proxy.authenticate
+        && !proxy.username.is_empty()
+        && !proxy.password.is_empty()
+    {
+        CredentialAction::Save
+    } else {
+        // Proxy or authentication turned off for this session: keep what was
+        // saved so turning it back on does not ask again.
+        CredentialAction::Keep
+    }
+}
+
+/// Turning "Remember" off forgets the saved pair immediately and records the
+/// choice, so the next launch does not turn it back on.
+pub fn set_remember_credentials(app: &tauri::AppHandle, remember: bool) {
+    use tauri_plugin_store::StoreExt;
+    if !remember {
+        super::secrets::forget(app);
+    }
+    if let Ok(store) = app.store(STORE_FILE) {
+        let mut persisted: ConnectionProfile = store
+            .get(STORE_KEY)
+            .and_then(|v| serde_json::from_value(v).ok())
+            .unwrap_or_default();
+        if persisted.final_proxy.remember_credentials == remember {
+            return;
+        }
+        persisted.final_proxy.remember_credentials = remember;
+        if let Ok(value) = serde_json::to_value(persisted.without_secrets()) {
+            store.set(STORE_KEY, value);
+            let _ = store.save();
+        }
+    }
 }
 
 pub fn save(app: &tauri::AppHandle, profile: &ConnectionProfile) {
@@ -657,5 +772,13 @@ pub fn save(app: &tauri::AppHandle, profile: &ConnectionProfile) {
             store.set(STORE_KEY, value);
             let _ = store.save();
         }
+    }
+    // The final proxy's own username and password are kept separately and
+    // encrypted (secrets.rs), and only once the proxy has accepted them.
+    let proxy = &profile.final_proxy;
+    match credential_action(proxy) {
+        CredentialAction::Save => super::secrets::save(app, &proxy.username, &proxy.password),
+        CredentialAction::Forget => super::secrets::forget(app),
+        CredentialAction::Keep => {}
     }
 }

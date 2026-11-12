@@ -64,3 +64,16 @@ pub async fn restore_normal_networking(
         .await
         .map_err(|e| AetherError::WholeLaptop(e.to_string()))?
 }
+
+/// Whether this platform can keep the final proxy's credentials encrypted
+/// between launches (Windows only).
+#[tauri::command]
+pub fn credentials_storage_supported() -> bool {
+    aether::secrets::supported()
+}
+
+/// Turning this off forgets the saved final-proxy username and password.
+#[tauri::command]
+pub fn set_remember_credentials(app: AppHandle, remember: bool) {
+    aether::profiles::set_remember_credentials(&app, remember);
+}

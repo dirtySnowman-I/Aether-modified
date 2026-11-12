@@ -28,6 +28,8 @@ export interface FinalProxyProfile {
   udp_enabled: boolean;
   username: string;
   password: string;
+  /** Keep the username and password for the next launch (Windows only). */
+  remember_credentials: boolean;
 }
 
 export interface ConnectionProfile {

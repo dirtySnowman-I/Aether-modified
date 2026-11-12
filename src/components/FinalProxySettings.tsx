@@ -16,6 +16,8 @@ export function FinalProxySettings() {
   const proxy = useConnectionStore((s) => s.profile.final_proxy)
   const status = useConnectionStore((s) => s.status)
   const update = useConnectionStore((s) => s.setFinalProxy)
+  const canRemember = useConnectionStore((s) => s.credentialStorage)
+  const setRemember = useConnectionStore((s) => s.setRememberCredentials)
   const locked = status.state !== "Idle" && status.state !== "Error"
   return (
     <div className="flex flex-col gap-2 rounded-md bg-black/10 p-2 ring-1 ring-white/10">
@@ -118,10 +120,31 @@ export function FinalProxySettings() {
                 aria-label="Final proxy password"
                 autoComplete="off"
               />
-              <p className="text-[11px] leading-4 text-muted-foreground">
-                Credentials stay in memory. Enter them again after restarting
-                the app.
-              </p>
+              {canRemember ? (
+                <>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs text-muted-foreground">
+                      Remember on this computer
+                    </span>
+                    <Switch
+                      checked={proxy.remember_credentials}
+                      disabled={locked}
+                      onCheckedChange={setRemember}
+                      aria-label="Remember final proxy username and password"
+                    />
+                  </div>
+                  <p className="text-[11px] leading-4 text-muted-foreground">
+                    {proxy.remember_credentials
+                      ? "Saved after the first successful connection, encrypted for your Windows account. Turn off to delete them."
+                      : "Not saved. Enter them again after restarting the app."}
+                  </p>
+                </>
+              ) : (
+                <p className="text-[11px] leading-4 text-muted-foreground">
+                  Credentials stay in memory. Enter them again after restarting
+                  the app.
+                </p>
+              )}
             </div>
           )}
           <div className="flex items-center justify-between gap-3">

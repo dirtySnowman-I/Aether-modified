@@ -193,9 +193,11 @@ fn read_loop(
     prompts_done: Arc<AtomicBool>,
 ) {
     let mut answered: HashSet<&'static str> = HashSet::new();
+    let mut seen: HashSet<&'static str> = HashSet::new();
     let mut current_section: Option<&'static str> = None;
     let mut line_buf = String::new();
     let mut byte_buf = [0u8; 4096];
+    let mut pending_bytes: Vec<u8> = Vec::new();
     let mut code_prompt_visible = false;
 
     loop {
@@ -204,7 +206,10 @@ fn read_loop(
             Ok(n) => n,
             Err(_) => break,
         };
-        line_buf.push_str(&String::from_utf8_lossy(&byte_buf[..n]));
+        // A multi-byte character can be split across two reads; decode only
+        // complete characters and carry the rest over.
+        pending_bytes.extend_from_slice(&byte_buf[..n]);
+        line_buf.push_str(&take_utf8(&mut pending_bytes));
 
         // Emit every complete line, tracking which known prompt "section"
         // we're currently in (the last recognized header line wins — plain
@@ -214,14 +219,25 @@ fn read_loop(
             if line.is_empty() {
                 continue;
             }
+            let mut is_header = false;
             for rule in PROMPT_TABLE {
                 if (rule.header_matches)(&line) {
                     current_section = Some(rule.id);
+                    seen.insert(rule.id);
+                    is_header = true;
                     // Seeing a header again means Aether restarted its prompt
                     // sequence (its own stdin read timed out — see
                     // prompts.rs) — allow re-answering, or it blocks forever.
                     answered.remove(rule.id);
                 }
+            }
+            // Aether ≥1.1.1 receives the whole profile as flags and never
+            // prompts, so "all prompts answered" alone would never happen and
+            // the GUI would show "Starting Aether…" for the whole scan. Any
+            // ordinary output line with no unanswered prompt pending means
+            // setup is over.
+            if !is_header && seen.iter().all(|id| answered.contains(id)) {
+                prompts_done.store(true, Ordering::Relaxed);
             }
             let _ = log_tx.send(LogEvent {
                 line,
@@ -273,6 +289,33 @@ fn read_loop(
             }
         }
     }
+}
+
+/// Length of an incomplete UTF-8 sequence at the end of `bytes` (0–3).
+fn incomplete_utf8_suffix(bytes: &[u8]) -> usize {
+    for k in 1..=bytes.len().min(3) {
+        let b = bytes[bytes.len() - k];
+        if b & 0xC0 == 0x80 {
+            continue; // continuation byte: keep looking for the lead byte
+        }
+        let needed = match b {
+            0xF0.. => 4,
+            0xE0.. => 3,
+            0xC0.. => 2,
+            _ => 1,
+        };
+        return if needed > k { k } else { 0 };
+    }
+    0
+}
+
+/// Decodes everything in `pending` except an incomplete trailing character,
+/// which stays for the next read. Invalid bytes still become U+FFFD.
+fn take_utf8(pending: &mut Vec<u8>) -> String {
+    let split = pending.len() - incomplete_utf8_suffix(pending);
+    let text = String::from_utf8_lossy(&pending[..split]).into_owned();
+    pending.drain(..split);
+    text
 }
 
 /// Longest the unterminated tail may grow before the front is discarded.
@@ -384,6 +427,66 @@ mod tests {
         assert_eq!(buf, "abc\r");
         assert_eq!(feed(&mut buf, "\n"), ["abc"]); // the \r\n was split across reads
         assert_eq!(buf, "");
+    }
+
+    #[test]
+    fn utf8_split_across_reads_is_not_garbled() {
+        let text = "é😀a".as_bytes();
+        for cut in 0..=text.len() {
+            let mut pending = text[..cut].to_vec();
+            let mut out = take_utf8(&mut pending);
+            pending.extend_from_slice(&text[cut..]);
+            out.push_str(&take_utf8(&mut pending));
+            assert_eq!(out, "é😀a", "cut at {cut}");
+            assert!(pending.is_empty());
+        }
+        // Invalid bytes are still replaced, not held forever.
+        let mut pending = vec![b'a', 0xFF, b'b'];
+        assert_eq!(take_utf8(&mut pending), "a\u{FFFD}b");
+    }
+
+    struct SharedWriter(Arc<Mutex<Vec<u8>>>);
+    impl Write for SharedWriter {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(buf);
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn run(output: &str) -> (bool, String) {
+        let written = Arc::new(Mutex::new(Vec::new()));
+        let writer: Arc<Mutex<Box<dyn Write + Send>>> =
+            Arc::new(Mutex::new(Box::new(SharedWriter(written.clone()))));
+        let done = Arc::new(AtomicBool::new(false));
+        let (tx, _rx) = std::sync::mpsc::channel();
+        read_loop(
+            &mut std::io::Cursor::new(output.as_bytes().to_vec()),
+            writer,
+            ConnectionProfile::default(),
+            tx,
+            done.clone(),
+        );
+        let answers = String::from_utf8(written.lock().unwrap().clone()).unwrap();
+        (done.load(Ordering::Relaxed), answers)
+    }
+
+    #[test]
+    fn flag_driven_startup_leaves_the_launching_state() {
+        let (done, answers) = run("Aether v1.5.0\n[+] probing gateways budget=120s\n");
+        assert!(done, "no prompts appear when the profile is passed as flags");
+        assert!(answers.is_empty());
+    }
+
+    #[test]
+    fn an_unanswered_prompt_keeps_the_launching_state() {
+        let (done, answers) = run("Protocol:\n  1) MASQUE\nChoose [1-3] (default 1): ");
+        assert!(!done);
+        assert_eq!(answers, "1\r\n");
+        let (done, _) = run("Protocol:\n  1) MASQUE\n");
+        assert!(!done);
     }
 
     #[test]
