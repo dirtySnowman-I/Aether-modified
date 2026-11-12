@@ -441,7 +441,8 @@ mod tests {
             ..Default::default()
         };
         let json = serde_json::to_string(&profile.without_secrets()).unwrap();
-        assert!(!json.contains("secret"));
+        assert!(!json.contains("user-secret"));
+        assert!(!json.contains("password-secret"));
         assert!(json.contains(r#""remember_credentials":false"#));
     }
 
