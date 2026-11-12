@@ -416,9 +416,13 @@ fn disconnect_cancels_an_incomplete_udp_handshake() {
     let core = tcp();
     let core_addr = core.local_addr().unwrap();
     let (waiting_tx, waiting_rx) = mpsc::channel();
+    // Generous waits for slow shared CI runners (a 3-second wait failed once
+    // on Windows). They stay below the relay's 15-second HANDSHAKE_TIMEOUT,
+    // so a passing test still proves Disconnect cancelled the handshake.
+    const SLOW_RUNNER: Duration = Duration::from_secs(10);
     let fake = thread::spawn(move || {
         let (mut c, _) = core.accept().unwrap();
-        c.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
+        c.set_read_timeout(Some(SLOW_RUNNER)).unwrap();
         login(&mut c, false);
         request(&mut c, 1);
         reply(&mut c, 0).unwrap();
@@ -445,9 +449,11 @@ fn disconnect_cancels_an_incomplete_udp_handshake() {
     let check = thread::spawn(move || {
         done_tx.send(Association::open(&shared).is_err()).unwrap();
     });
-    waiting_rx.recv_timeout(Duration::from_secs(3)).unwrap();
+    waiting_rx.recv_timeout(SLOW_RUNNER).unwrap();
     drop(server);
-    assert!(done_rx.recv_timeout(Duration::from_secs(2)).unwrap());
+    // Without cancellation, open() would only return when the fake gives up
+    // (SLOW_RUNNER), so this must stay well below it.
+    assert!(done_rx.recv_timeout(Duration::from_secs(5)).unwrap());
     check.join().unwrap();
     fake.join().unwrap();
 }

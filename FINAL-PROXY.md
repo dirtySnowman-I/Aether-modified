@@ -85,7 +85,10 @@ proxy may use a different exit address for each connection.
   are retained for sessions where final-proxy mode is disabled.
 - The local listener uses Aether-GUI's existing bind setting and has no
   authentication. Its default is loopback. The relay allows up to 128 simultaneous
-  client connections and applies a 15-second total handshake deadline.
+  client connections and applies a 15-second total handshake deadline. A
+  connection beyond that limit is refused and noted in the log. A TCP
+  connection with no data in either direction for 10 minutes is closed; a
+  one-way stream such as a long download stays open.
 
 ## Build on Windows
 

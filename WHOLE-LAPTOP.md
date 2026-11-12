@@ -10,8 +10,8 @@ extension. This works with the WireGuard protocol you already use in Aether.
 
 1. Open the latest successful [build](https://github.com/dirtySnowman-I/Aether-modified/actions/workflows/build.yml)
    on `main` (builds now start automatically on updates; **Run workflow** is also
-   available). Extract `bundles-windows-x86_64`, then install the **0.9.4** setup
-   executable or MSI. Version 0.9.4 remembers the final proxy's username and
+   available). Extract `bundles-windows-x86_64`, then install the **0.9.5** setup
+   executable or MSI. Version 0.9.5 closes idle relayed connections. Version 0.9.4 remembers the final proxy's username and
    password between launches. Version 0.9.3 uses a userspace TCP stack and requires
    returned TCP data plus a DNS reply through the final proxy after capture
    starts. Version 0.9.2 added explicit routes and route-selection checks. Version 0.9.1 fixed the

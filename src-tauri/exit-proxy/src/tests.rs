@@ -462,3 +462,61 @@ fn total_handshake_deadline_closes_a_slow_connection() {
     drop(tracked);
     drop(server);
 }
+
+/// Two connected loopback sockets: (outside end, relay end).
+fn tcp_pair() -> (TcpStream, TcpStream) {
+    let l = listener();
+    let outside = socket(l.local_addr().unwrap());
+    let (inside, _) = l.accept().unwrap();
+    (outside, inside)
+}
+
+#[test]
+fn idle_relayed_connection_is_closed_quietly() {
+    let (mut app, app_side) = tcp_pair();
+    let (mut exit, exit_side) = tcp_pair();
+    let started = Instant::now();
+    let relay = thread::spawn(move || {
+        splice(
+            &app_side,
+            &exit_side,
+            Duration::from_millis(400),
+            Duration::from_millis(50),
+        )
+    });
+    // One exchange first: activity resets the idle clock.
+    app.write_all(b"ping").unwrap();
+    expected(&mut exit, b"ping");
+    let result = relay.join().unwrap();
+    assert!(result.is_ok(), "idle close is not an error: {result:?}");
+    assert!(started.elapsed() >= Duration::from_millis(400));
+    assert!(started.elapsed() < Duration::from_secs(3));
+    // Both outside ends see the connection end.
+    assert!(matches!(app.read(&mut [0]), Ok(0) | Err(_)));
+    assert!(matches!(exit.read(&mut [0]), Ok(0) | Err(_)));
+}
+
+#[test]
+fn one_way_stream_keeps_the_quiet_direction_open() {
+    let (mut app, app_side) = tcp_pair();
+    let (mut exit, exit_side) = tcp_pair();
+    let relay = thread::spawn(move || {
+        splice(
+            &app_side,
+            &exit_side,
+            Duration::from_millis(500),
+            Duration::from_millis(50),
+        )
+    });
+    // The app never sends; the exit streams for well past the idle timeout.
+    for i in 0..15u8 {
+        exit.write_all(&[i]).unwrap();
+        expected(&mut app, &[i]);
+        thread::sleep(Duration::from_millis(100));
+    }
+    assert!(!relay.is_finished(), "a live download must not be cut");
+    // Closing both ends finishes the relay (a reset may surface as an error).
+    drop(exit);
+    drop(app);
+    let _ = relay.join().unwrap();
+}

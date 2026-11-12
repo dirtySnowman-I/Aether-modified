@@ -218,8 +218,34 @@ if (import.meta.env.DEV) {
 
 const BUDGET_RE = /budget=(\d+)s/;
 
+/** Fields the user changed from `initial` keep their value; the rest come
+ * from `loaded`. Shallow: nested objects are merged by the caller. */
+function keepEdits<T extends object>(initial: T, current: T, loaded: T): T {
+  const merged = { ...loaded };
+  for (const key of Object.keys(current) as (keyof T)[]) {
+    if (current[key] !== initial[key]) merged[key] = current[key];
+  }
+  return merged;
+}
+
+/** The saved profile arrives a moment after the window opens. Anything the
+ * user already typed or toggled in that moment wins over the saved value
+ * instead of being silently overwritten. */
+function mergeLoadedProfile(
+  initial: ConnectionProfile,
+  current: ConnectionProfile,
+  loaded: ConnectionProfile,
+): ConnectionProfile {
+  return {
+    ...keepEdits(initial, current, loaded),
+    final_proxy: keepEdits(initial.final_proxy, current.final_proxy, loaded.final_proxy),
+  };
+}
+
 /** Call once from App's top-level effect; returns a cleanup function. */
 export async function initConnectionListeners(): Promise<() => void> {
+  // Snapshot before anything async, to tell user edits from defaults.
+  const initialProfile = useConnectionStore.getState().profile;
   // Log lines arrive fast during route scanning; flushing to the store per
   // line would mean an O(logs) array copy + a re-render each. Coalesce into
   // one store write per ~100ms instead.
@@ -264,7 +290,11 @@ export async function initConnectionListeners(): Promise<() => void> {
       invoke<ConnectionProfile>("get_default_profile"),
       invoke<boolean>("credentials_storage_supported"),
     ]);
-    useConnectionStore.setState({ status, profile, credentialStorage });
+    useConnectionStore.setState((s) => ({
+      status,
+      credentialStorage,
+      profile: mergeLoadedProfile(initialProfile, s.profile, profile),
+    }));
   } catch (e) {
     console.error("Failed to load initial connection state:", e);
   }

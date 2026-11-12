@@ -12,6 +12,10 @@ See [FINAL-PROXY.md](FINAL-PROXY.md) for setup and build instructions, and
 [VERIFICATION.md](VERIFICATION.md) for test results and remaining validation limits.
 The desktop application retains the upstream Aether-GUI name.
 
+**New in 0.9.5:** the local proxy closes connections idle for 10 minutes in both
+directions and logs when its 128-connection limit refuses one; settings typed
+right after launch are no longer overwritten by the saved ones.
+
 **New in 0.9.4:** the final proxy's username and password are remembered after
 the first successful connection on Windows (encrypted with DPAPI for your Windows
 account; turn off **Remember on this computer** to delete them). Also fixes the
